@@ -126,10 +126,6 @@ class HomeScreen extends StatelessWidget {
                         icon: Icons.sailing_rounded,
                         label: 'Experiences',
                       ),
-                      _CategoryItem(
-                        icon: Icons.restaurant_rounded,
-                        label: 'Dining',
-                      ),
                     ],
                   ),
                 ),
