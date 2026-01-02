@@ -4,6 +4,10 @@ import '../../theme/colors.dart';
 import '../../widgets/bahama_card.dart';
 import '../../utils/constants.dart';
 import '../auth/login_screen.dart';
+import '../profile/edit_profile_screen.dart';
+import '../profile/payment_methods_screen.dart';
+import '../profile/help_support_screen.dart';
+import '../profile/about_screen.dart';
 import 'settings_screen.dart';
 import 'favorites_screen.dart';
 import 'notifications_screen.dart';
@@ -175,12 +179,26 @@ class ProfileScreen extends StatelessWidget {
                       _ProfileMenuItem(
                         icon: Icons.person_outline_rounded,
                         title: 'Edit Profile',
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const EditProfileScreen(),
+                            ),
+                          );
+                        },
                       ),
                       _ProfileMenuItem(
                         icon: Icons.credit_card_rounded,
                         title: 'Payment Methods',
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PaymentMethodsScreen(),
+                            ),
+                          );
+                        },
                       ),
                       _ProfileMenuItem(
                         icon: Icons.notifications_outlined,
@@ -236,12 +254,26 @@ class ProfileScreen extends StatelessWidget {
                       _ProfileMenuItem(
                         icon: Icons.help_outline_rounded,
                         title: 'Help & Support',
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const HelpSupportScreen(),
+                            ),
+                          );
+                        },
                       ),
                       _ProfileMenuItem(
                         icon: Icons.info_outline_rounded,
                         title: 'About BahamaVista',
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AboutScreen(),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
                       _ProfileMenuItem(

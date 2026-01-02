@@ -7,6 +7,9 @@ import '../../widgets/bahama_card.dart';
 import '../../widgets/bahama_text_field.dart';
 import '../../utils/constants.dart';
 import '../booking/hotel_detail_screen.dart';
+import '../booking/experience_detail_screen.dart';
+import '../booking/car_detail_screen.dart';
+import '../booking/flight_booking_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -244,6 +247,7 @@ class _CarsTab extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: _CarCard(
+                    car: car,
                     name: car['name'] as String,
                     type: '${car['type']} • ${car['transmission']}',
                     price: '\$${car['price']}/day',
@@ -262,6 +266,7 @@ class _CarsTab extends StatelessWidget {
 }
 
 class _CarCard extends StatelessWidget {
+  final Map<String, dynamic> car;
   final String name;
   final String type;
   final String price;
@@ -270,6 +275,7 @@ class _CarCard extends StatelessWidget {
   final bool isPopular;
 
   const _CarCard({
+    required this.car,
     required this.name,
     required this.type,
     required this.price,
@@ -280,7 +286,15 @@ class _CarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BahamaCard(
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => CarDetailScreen(car: car),
+          ),
+        );
+      },
+      child: BahamaCard(
       padding: EdgeInsets.zero,
       child: Column(
         children: [
@@ -391,6 +405,7 @@ class _CarCard extends StatelessWidget {
           ),
         ],
       ),
+      ),
     );
   }
 }
@@ -398,50 +413,17 @@ class _CarCard extends StatelessWidget {
 class _FlightsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final flights = [
-      {
-        'airline': 'Bahamasair',
-        'departure': '08:30 AM',
-        'arrival': '10:45 AM',
-        'from': 'MIA',
-        'to': 'NAS',
-        'price': 189,
-        'duration': '2h 15m',
-        'isDirect': true,
-      },
-      {
-        'airline': 'American Airlines',
-        'departure': '11:00 AM',
-        'arrival': '01:20 PM',
-        'from': 'JFK',
-        'to': 'NAS',
-        'price': 245,
-        'duration': '2h 20m',
-        'isDirect': true,
-      },
-      {
-        'airline': 'Delta',
-        'departure': '02:30 PM',
-        'arrival': '04:50 PM',
-        'from': 'ATL',
-        'to': 'NAS',
-        'price': 215,
-        'duration': '2h 20m',
-        'isDirect': false,
-      },
-    ];
-
     return AnimationLimiter(
       child: ListView.builder(
         padding: const EdgeInsets.all(24),
-        itemCount: flights.length + 1,
+        itemCount: DemoData.flights.length + 1,
         itemBuilder: (context, index) {
           if (index == 0) {
-            return const Padding(
-              padding: EdgeInsets.only(bottom: 16),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
               child: Text(
-                '24 Flights Available',
-                style: TextStyle(
+                '${DemoData.flights.length} Flights Available',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: BahamaColors.deepTeal,
@@ -450,7 +432,7 @@ class _FlightsTab extends StatelessWidget {
             );
           }
 
-          final flight = flights[index - 1];
+          final flight = DemoData.flights[index - 1];
           return AnimationConfiguration.staggeredList(
             position: index,
             duration: const Duration(milliseconds: 375),
@@ -460,6 +442,7 @@ class _FlightsTab extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: _FlightCard(
+                    flight: flight,
                     airline: flight['airline'] as String,
                     departure: flight['departure'] as String,
                     arrival: flight['arrival'] as String,
@@ -480,6 +463,7 @@ class _FlightsTab extends StatelessWidget {
 }
 
 class _FlightCard extends StatelessWidget {
+  final Map<String, dynamic> flight;
   final String airline;
   final String departure;
   final String arrival;
@@ -490,6 +474,7 @@ class _FlightCard extends StatelessWidget {
   final bool isDirect;
 
   const _FlightCard({
+    required this.flight,
     required this.airline,
     required this.departure,
     required this.arrival,
@@ -502,7 +487,15 @@ class _FlightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BahamaCard(
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => FlightBookingScreen(flight: flight),
+          ),
+        );
+      },
+      child: BahamaCard(
       child: Column(
         children: [
           Row(
@@ -662,6 +655,7 @@ class _FlightCard extends StatelessWidget {
           ),
         ],
       ),
+      ),
     );
   }
 }
@@ -707,7 +701,13 @@ class _ExperiencesTab extends StatelessWidget {
                         ? const BahamaVerifiedBadge()
                         : null,
                     onFavorite: () {},
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => ExperienceDetailScreen(experience: exp),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),

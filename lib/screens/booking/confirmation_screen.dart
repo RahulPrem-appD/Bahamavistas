@@ -85,11 +85,11 @@ class _ConfirmationScreenState extends State<ConfirmationScreen>
           gradient: BahamaColors.seaGradient,
         ),
         child: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
-                const Spacer(),
+                const SizedBox(height: 40),
 
                 // Success animation
                 AnimatedBuilder(
@@ -364,7 +364,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen>
                   },
                 ),
 
-                const Spacer(),
+                const SizedBox(height: 40),
 
                 // Actions
                 AnimatedBuilder(
