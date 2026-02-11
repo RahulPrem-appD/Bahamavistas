@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:intl/intl.dart';
 import '../../theme/colors.dart';
+import '../../providers/messages_provider.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String name;
   final bool isSupport;
+  final int? participantId;
 
   const ChatDetailScreen({
     super.key,
     required this.name,
     required this.isSupport,
+    this.participantId,
   });
 
   @override
@@ -17,11 +23,38 @@ class ChatDetailScreen extends StatefulWidget {
 
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
+  bool _isSending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.participantId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<MessagesProvider>().fetchMessages(widget.participantId!);
+      });
+    }
+  }
 
   @override
   void dispose() {
     _messageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty || widget.participantId == null) return;
+
+    setState(() => _isSending = true);
+    _messageController.clear();
+
+    await context.read<MessagesProvider>().sendMessage(
+      receiverId: widget.participantId!,
+      receiverType: 'vendor',
+      body: text,
+    );
+
+    if (mounted) setState(() => _isSending = false);
   }
 
   @override
@@ -62,7 +95,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         size: 20,
                       )
                     : Text(
-                        widget.name[0],
+                        widget.name.isNotEmpty ? widget.name[0] : '?',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -124,95 +157,68 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         children: [
           // Messages
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Date divider
-                _DateDivider(date: 'Today'),
-                const SizedBox(height: 16),
+            child: widget.participantId != null
+                ? Consumer<MessagesProvider>(
+                    builder: (context, provider, _) {
+                      if (provider.isLoading && provider.currentMessages.isEmpty) {
+                        return ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: 5,
+                          itemBuilder: (context, index) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Align(
+                              alignment: index % 2 == 0
+                                  ? Alignment.centerLeft
+                                  : Alignment.centerRight,
+                              child: Shimmer.fromColors(
+                                baseColor: BahamaColors.greyLight,
+                                highlightColor: BahamaColors.offWhiteMist,
+                                child: Container(
+                                  height: 50,
+                                  width: MediaQuery.of(context).size.width * 0.6,
+                                  decoration: BoxDecoration(
+                                    color: BahamaColors.greyLight,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
 
-                // Messages
-                if (widget.isSupport) ...[
-                  _MessageBubble(
-                    message: 'Hi! Welcome to BahamaVista support. How can I help you today?',
-                    isMe: false,
-                    time: '10:30 AM',
-                  ),
-                  const SizedBox(height: 12),
-                  _MessageBubble(
-                    message: 'Hi! I have a question about my upcoming booking at Atlantis.',
-                    isMe: true,
-                    time: '10:32 AM',
-                  ),
-                  const SizedBox(height: 12),
-                  _MessageBubble(
-                    message: 'Of course! I\'d be happy to help. Could you please share your confirmation number?',
-                    isMe: false,
-                    time: '10:33 AM',
-                  ),
-                  const SizedBox(height: 12),
-                  _MessageBubble(
-                    message: 'It\'s BV-2024-78542',
-                    isMe: true,
-                    time: '10:34 AM',
-                  ),
-                  const SizedBox(height: 12),
-                  _MessageBubble(
-                    message: 'Thank you! I can see your booking for Dec 29 - Jan 1 at Atlantis Paradise Island. What would you like to know?',
-                    isMe: false,
-                    time: '10:35 AM',
-                  ),
-                ] else ...[
-                  _MessageBubble(
-                    message: 'Hello! Thank you for booking with us.',
-                    isMe: false,
-                    time: '2:30 PM',
-                  ),
-                  const SizedBox(height: 12),
-                  _MessageBubble(
-                    message: 'Hi! I\'m excited for my stay. Is early check-in available?',
-                    isMe: true,
-                    time: '2:45 PM',
-                  ),
-                  const SizedBox(height: 12),
-                  _MessageBubble(
-                    message: 'We\'ll do our best to accommodate early check-in. Please let us know your arrival time and we\'ll confirm availability.',
-                    isMe: false,
-                    time: '3:00 PM',
-                  ),
-                  const SizedBox(height: 12),
-                  _MessageBubble(
-                    message: 'Great! I should arrive around 11 AM.',
-                    isMe: true,
-                    time: '3:15 PM',
-                  ),
-                  const SizedBox(height: 12),
-                  _MessageBubble(
-                    message: 'Perfect! Your room is ready! We look forward to welcoming you. 🌴',
-                    isMe: false,
-                    time: '3:20 PM',
-                  ),
-                ],
+                      final messages = provider.currentMessages;
+                      if (messages.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'No messages yet. Say hello!',
+                            style: TextStyle(
+                              color: BahamaColors.greyPrimary,
+                            ),
+                          ),
+                        );
+                      }
 
-                const SizedBox(height: 16),
-
-                // Quick replies (for support)
-                if (widget.isSupport) ...[
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _QuickReply(text: 'Modify booking'),
-                        _QuickReply(text: 'Cancel booking'),
-                        _QuickReply(text: 'Request refund'),
-                        _QuickReply(text: 'Other question'),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        reverse: true,
+                        itemCount: messages.length,
+                        itemBuilder: (context, index) {
+                          final msg = messages[messages.length - 1 - index];
+                          final timeStr = DateFormat('h:mm a').format(msg.createdAt);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _MessageBubble(
+                              message: msg.body,
+                              isMe: msg.isFromUser,
+                              time: timeStr,
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  )
+                : _buildStaticMessages(),
           ),
 
           // Input area
@@ -268,21 +274,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         style: const TextStyle(
                           color: BahamaColors.deepTeal,
                         ),
+                        onSubmitted: (_) => _sendMessage(),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      gradient: BahamaColors.ctaGradient,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.send_rounded,
-                      color: BahamaColors.deepTeal,
-                      size: 20,
+                  GestureDetector(
+                    onTap: _isSending ? null : _sendMessage,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(
+                        gradient: BahamaColors.ctaGradient,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _isSending ? Icons.hourglass_top : Icons.send_rounded,
+                        color: BahamaColors.deepTeal,
+                        size: 20,
+                      ),
                     ),
                   ),
                 ],
@@ -291,6 +301,41 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStaticMessages() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _DateDivider(date: 'Today'),
+        const SizedBox(height: 16),
+        if (widget.isSupport) ...[
+          _MessageBubble(
+            message: 'Hi! Welcome to BahamaVista support. How can I help you today?',
+            isMe: false,
+            time: '10:30 AM',
+          ),
+          const SizedBox(height: 12),
+          _MessageBubble(
+            message: 'Hi! I have a question about my upcoming booking.',
+            isMe: true,
+            time: '10:32 AM',
+          ),
+        ] else ...[
+          _MessageBubble(
+            message: 'Hello! Thank you for booking with us.',
+            isMe: false,
+            time: '2:30 PM',
+          ),
+          const SizedBox(height: 12),
+          _MessageBubble(
+            message: 'Hi! I\'m excited for my stay.',
+            isMe: true,
+            time: '2:45 PM',
+          ),
+        ],
+      ],
     );
   }
 }
@@ -376,7 +421,7 @@ class _MessageBubble extends StatelessWidget {
               message,
               style: TextStyle(
                 fontSize: 14,
-                color: isMe ? BahamaColors.deepTeal : BahamaColors.deepTeal,
+                color: BahamaColors.deepTeal,
                 height: 1.4,
               ),
             ),
@@ -423,4 +468,3 @@ class _QuickReply extends StatelessWidget {
     );
   }
 }
-

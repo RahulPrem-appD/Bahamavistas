@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../../theme/colors.dart';
 import '../../widgets/bahama_card.dart';
 import '../../utils/constants.dart';
+import '../../providers/auth_provider.dart';
 import '../auth/login_screen.dart';
 import '../profile/edit_profile_screen.dart';
 import '../profile/payment_methods_screen.dart';
@@ -98,48 +100,57 @@ class ProfileScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Sarah Mitchell',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: BahamaColors.deepTeal,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'sarah.mitchell@email.com',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: BahamaColors.greyPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: BahamaColors.islandBlue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.verified_rounded,
-                        size: 16,
-                        color: BahamaColors.islandBlue,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        'Verified Member',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: BahamaColors.islandBlue,
+                Consumer<AuthProvider>(
+                  builder: (context, auth, _) {
+                    final user = auth.currentUser;
+                    return Column(
+                      children: [
+                        Text(
+                          user?.name ?? 'Guest',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: BahamaColors.deepTeal,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(height: 4),
+                        Text(
+                          user?.email ?? '',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: BahamaColors.greyPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: BahamaColors.islandBlue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.verified_rounded,
+                                size: 16,
+                                color: BahamaColors.islandBlue,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${(user?.tier ?? 'bronze').substring(0, 1).toUpperCase()}${(user?.tier ?? 'bronze').substring(1)} Member',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: BahamaColors.islandBlue,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 32),
@@ -280,13 +291,16 @@ class ProfileScreen extends StatelessWidget {
                         icon: Icons.logout_rounded,
                         title: 'Log Out',
                         isDestructive: true,
-                        onTap: () {
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                              builder: (context) => const LoginScreen(),
-                            ),
-                            (route) => false,
-                          );
+                        onTap: () async {
+                          await context.read<AuthProvider>().logout();
+                          if (context.mounted) {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (context) => const LoginScreen(),
+                              ),
+                              (route) => false,
+                            );
+                          }
                         },
                       ),
                     ],

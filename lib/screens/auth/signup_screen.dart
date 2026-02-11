@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../theme/colors.dart';
 import '../../widgets/bahama_button.dart';
 import '../../widgets/bahama_text_field.dart';
-import 'profile_setup_screen.dart';
+import '../../providers/auth_provider.dart';
+import '../home/main_navigation.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -12,9 +14,93 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSignup() async {
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+    final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    if (firstName.isEmpty || lastName.isEmpty || email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all required fields')),
+      );
+      return;
+    }
+
+    if (!email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid email address')),
+      );
+      return;
+    }
+
+    if (password.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password must be at least 8 characters')),
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match')),
+      );
+      return;
+    }
+
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please agree to the Terms of Service')),
+      );
+      return;
+    }
+
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.register(
+      email: email,
+      password: password,
+      firstName: firstName,
+      lastName: lastName,
+      phone: phone.isNotEmpty ? phone : null,
+    );
+
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const MainNavigation()),
+        (route) => false,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(authProvider.error ?? 'Registration failed')),
+      );
+      authProvider.clearError();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,20 +182,30 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                           child: Column(
                             children: [
-                              const BahamaTextField(
-                                labelText: 'Full Name',
-                                hintText: 'Enter your full name',
+                              BahamaTextField(
+                                controller: _firstNameController,
+                                labelText: 'First Name',
+                                hintText: 'Enter your first name',
                                 prefixIcon: Icons.person_outline,
                               ),
                               const SizedBox(height: 20),
-                              const BahamaTextField(
+                              BahamaTextField(
+                                controller: _lastNameController,
+                                labelText: 'Last Name',
+                                hintText: 'Enter your last name',
+                                prefixIcon: Icons.person_outline,
+                              ),
+                              const SizedBox(height: 20),
+                              BahamaTextField(
+                                controller: _emailController,
                                 labelText: 'Email',
                                 hintText: 'Enter your email',
                                 prefixIcon: Icons.email_outlined,
                                 keyboardType: TextInputType.emailAddress,
                               ),
                               const SizedBox(height: 20),
-                              const BahamaTextField(
+                              BahamaTextField(
+                                controller: _phoneController,
                                 labelText: 'Phone Number',
                                 hintText: 'Enter your phone number',
                                 prefixIcon: Icons.phone_outlined,
@@ -117,6 +213,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               ),
                               const SizedBox(height: 20),
                               BahamaTextField(
+                                controller: _passwordController,
                                 labelText: 'Password',
                                 hintText: 'Create a password',
                                 prefixIcon: Icons.lock_outline,
@@ -132,6 +229,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               ),
                               const SizedBox(height: 20),
                               BahamaTextField(
+                                controller: _confirmPasswordController,
                                 labelText: 'Confirm Password',
                                 hintText: 'Confirm your password',
                                 prefixIcon: Icons.lock_outline,
@@ -200,14 +298,12 @@ class _SignupScreenState extends State<SignupScreen> {
                               ),
                               const SizedBox(height: 24),
 
-                              BahamaButton(
-                                text: 'Create Account',
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const ProfileSetupScreen(),
-                                    ),
+                              Consumer<AuthProvider>(
+                                builder: (context, auth, _) {
+                                  return BahamaButton(
+                                    text: 'Create Account',
+                                    isLoading: auth.isLoading,
+                                    onPressed: _handleSignup,
                                   );
                                 },
                               ),
@@ -254,4 +350,3 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 }
-

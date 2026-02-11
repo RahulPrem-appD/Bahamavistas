@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:provider/provider.dart';
 import '../../theme/colors.dart';
 import '../../widgets/bahama_card.dart';
 import '../../widgets/bahama_text_field.dart';
 import '../../utils/constants.dart';
+import '../../providers/stays_provider.dart';
+import '../../providers/cars_provider.dart';
+import '../../providers/experiences_provider.dart';
+import '../../providers/favorites_provider.dart';
+import '../../services/listing_service.dart';
 import '../booking/hotel_detail_screen.dart';
 import '../booking/experience_detail_screen.dart';
 import '../booking/car_detail_screen.dart';
@@ -26,6 +32,11 @@ class _SearchScreenState extends State<SearchScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<StaysProvider>().fetchStays();
+      context.read<CarsProvider>().fetchCars();
+      context.read<ExperiencesProvider>().fetchExperiences();
+    });
   }
 
   @override
@@ -132,85 +143,113 @@ class _SearchScreenState extends State<SearchScreen>
 class _HotelsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return AnimationLimiter(
-      child: ListView.builder(
-        padding: const EdgeInsets.all(24),
-        itemCount: DemoData.hotels.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return Padding(
+    return Consumer<StaysProvider>(
+      builder: (context, staysProvider, _) {
+        if (staysProvider.isLoading && staysProvider.stays.isEmpty) {
+          return ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: 3,
+            itemBuilder: (context, index) => Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${DemoData.hotels.length} Hotels Found',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: BahamaColors.deepTeal,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: BahamaColors.whiteSand,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: BahamaColors.greyLight),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.sort_rounded, size: 16, color: BahamaColors.islandBlue),
-                        SizedBox(width: 4),
-                        Text(
-                          'Sort',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: BahamaColors.islandBlue,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final hotel = DemoData.hotels[index - 1];
-          return AnimationConfiguration.staggeredList(
-            position: index,
-            duration: const Duration(milliseconds: 375),
-            child: SlideAnimation(
-              verticalOffset: 50.0,
-              child: FadeInAnimation(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: BahamaImageCard(
-                    imageUrl: hotel['image'] as String,
-                    title: hotel['name'] as String,
-                    subtitle: '${hotel['location']} • ${hotel['type']}',
-                    price: '\$${hotel['price']}/night',
-                    rating: hotel['rating'] as double,
-                    reviews: hotel['reviews'] as int,
-                    badge: hotel['isVerified'] == true
-                        ? const BahamaVerifiedBadge()
-                        : null,
-                    onFavorite: () {},
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => HotelDetailScreen(hotel: hotel),
-                        ),
-                      );
-                    },
+              child: Shimmer.fromColors(
+                baseColor: BahamaColors.greyLight,
+                highlightColor: BahamaColors.offWhiteMist,
+                child: Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: BahamaColors.greyLight,
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
               ),
             ),
           );
-        },
-      ),
+        }
+
+        final stays = staysProvider.stays;
+        return AnimationLimiter(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: stays.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${staysProvider.totalCount} Hotels Found',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: BahamaColors.deepTeal,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: BahamaColors.whiteSand,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: BahamaColors.greyLight),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.sort_rounded, size: 16, color: BahamaColors.islandBlue),
+                            SizedBox(width: 4),
+                            Text(
+                              'Sort',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: BahamaColors.islandBlue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final stay = stays[index - 1];
+              return AnimationConfiguration.staggeredList(
+                position: index,
+                duration: const Duration(milliseconds: 375),
+                child: SlideAnimation(
+                  verticalOffset: 50.0,
+                  child: FadeInAnimation(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: BahamaImageCard(
+                        imageUrl: stay.mainImage,
+                        title: stay.name,
+                        subtitle: '${stay.location} • ${stay.propertyType}',
+                        price: '\$${stay.price.toStringAsFixed(0)}/night',
+                        rating: stay.rating,
+                        reviews: stay.reviewCount,
+                        badge: stay.verified
+                            ? const BahamaVerifiedBadge()
+                            : null,
+                        onFavorite: () {
+                          context.read<FavoritesProvider>().toggleFavorite(stay.listingId);
+                        },
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => HotelDetailScreen(stay: stay),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -218,49 +257,88 @@ class _HotelsTab extends StatelessWidget {
 class _CarsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return AnimationLimiter(
-      child: ListView.builder(
-        padding: const EdgeInsets.all(24),
-        itemCount: DemoData.cars.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return Padding(
+    return Consumer<CarsProvider>(
+      builder: (context, carsProvider, _) {
+        if (carsProvider.isLoading && carsProvider.cars.isEmpty) {
+          return ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: 3,
+            itemBuilder: (context, index) => Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                '${DemoData.cars.length} Cars Available',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: BahamaColors.deepTeal,
-                ),
-              ),
-            );
-          }
-
-          final car = DemoData.cars[index - 1];
-          return AnimationConfiguration.staggeredList(
-            position: index,
-            duration: const Duration(milliseconds: 375),
-            child: SlideAnimation(
-              verticalOffset: 50.0,
-              child: FadeInAnimation(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _CarCard(
-                    car: car,
-                    name: car['name'] as String,
-                    type: '${car['type']} • ${car['transmission']}',
-                    price: '\$${car['price']}/day',
-                    features: (car['features'] as List).cast<String>(),
-                    imageUrl: car['image'] as String,
-                    isPopular: car['isPopular'] as bool,
+              child: Shimmer.fromColors(
+                baseColor: BahamaColors.greyLight,
+                highlightColor: BahamaColors.offWhiteMist,
+                child: Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: BahamaColors.greyLight,
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
               ),
             ),
           );
-        },
-      ),
+        }
+
+        final cars = carsProvider.cars;
+        return AnimationLimiter(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: cars.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    '${carsProvider.totalCount} Cars Available',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: BahamaColors.deepTeal,
+                    ),
+                  ),
+                );
+              }
+
+              final car = cars[index - 1];
+              final carMap = {
+                'name': car.name,
+                'type': car.vehicleType,
+                'transmission': car.transmission,
+                'price': car.price.toInt(),
+                'features': car.features,
+                'image': car.mainImage,
+                'isPopular': car.isPopular,
+                'seats': car.seats,
+                'fuelType': car.fuelType,
+                'mileage': car.mileagePolicy,
+                'description': car.description,
+              };
+              return AnimationConfiguration.staggeredList(
+                position: index,
+                duration: const Duration(milliseconds: 375),
+                child: SlideAnimation(
+                  verticalOffset: 50.0,
+                  child: FadeInAnimation(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _CarCard(
+                        car: carMap,
+                        name: car.name,
+                        type: '${car.vehicleType} • ${car.transmission}',
+                        price: '\$${car.price.toStringAsFixed(0)}/day',
+                        features: car.features,
+                        imageUrl: car.mainImage,
+                        isPopular: car.isPopular,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -663,58 +741,101 @@ class _FlightCard extends StatelessWidget {
 class _ExperiencesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return AnimationLimiter(
-      child: ListView.builder(
-        padding: const EdgeInsets.all(24),
-        itemCount: DemoData.experiences.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return const Padding(
-              padding: EdgeInsets.only(bottom: 16),
-              child: Text(
-                '89 Experiences',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: BahamaColors.deepTeal,
-                ),
-              ),
-            );
-          }
-
-          final exp = DemoData.experiences[index - 1];
-          return AnimationConfiguration.staggeredList(
-            position: index,
-            duration: const Duration(milliseconds: 375),
-            child: SlideAnimation(
-              verticalOffset: 50.0,
-              child: FadeInAnimation(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: BahamaImageCard(
-                    imageUrl: exp['image'] as String,
-                    title: exp['name'] as String,
-                    subtitle: '${exp['location']} • ${exp['duration']} • ${exp['type']}',
-                    price: '\$${exp['price']}/person',
-                    rating: exp['rating'] as double,
-                    badge: exp['isVerified'] == true
-                        ? const BahamaVerifiedBadge()
-                        : null,
-                    onFavorite: () {},
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => ExperienceDetailScreen(experience: exp),
-                        ),
-                      );
-                    },
+    return Consumer<ExperiencesProvider>(
+      builder: (context, expProvider, _) {
+        if (expProvider.isLoading && expProvider.experiences.isEmpty) {
+          return ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: 3,
+            itemBuilder: (context, index) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Shimmer.fromColors(
+                baseColor: BahamaColors.greyLight,
+                highlightColor: BahamaColors.offWhiteMist,
+                child: Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: BahamaColors.greyLight,
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
               ),
             ),
           );
-        },
-      ),
+        }
+
+        final experiences = expProvider.experiences;
+        return AnimationLimiter(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: experiences.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    '${expProvider.totalCount} Experiences',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: BahamaColors.deepTeal,
+                    ),
+                  ),
+                );
+              }
+
+              final exp = experiences[index - 1];
+              final expMap = {
+                'name': exp.name,
+                'location': exp.location,
+                'duration': exp.duration,
+                'type': exp.activityType,
+                'price': (exp.priceAdult ?? exp.price).toInt(),
+                'rating': exp.rating,
+                'image': exp.mainImage,
+                'isVerified': exp.verified,
+                'reviews': exp.reviewCount,
+                'description': exp.description,
+                'includes': exp.inclusionsList,
+                'meetingPoint': exp.meetingPoint,
+                'maxGroupSize': exp.groupSizeMax,
+              };
+              return AnimationConfiguration.staggeredList(
+                position: index,
+                duration: const Duration(milliseconds: 375),
+                child: SlideAnimation(
+                  verticalOffset: 50.0,
+                  child: FadeInAnimation(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: BahamaImageCard(
+                        imageUrl: exp.mainImage,
+                        title: exp.name,
+                        subtitle: '${exp.location} • ${exp.duration} • ${exp.activityType}',
+                        price: '\$${(exp.priceAdult ?? exp.price).toStringAsFixed(0)}/person',
+                        rating: exp.rating,
+                        badge: exp.verified
+                            ? const BahamaVerifiedBadge()
+                            : null,
+                        onFavorite: () {
+                          context.read<FavoritesProvider>().toggleFavorite(exp.listingId);
+                        },
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => ExperienceDetailScreen(experience: expMap),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -974,7 +1095,17 @@ class _FilterSheetState extends State<_FilterSheet> {
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: () => Navigator.pop(context),
+                        onTap: () {
+                          final filters = StayFilters(
+                            minPrice: _priceRange.start,
+                            maxPrice: _priceRange.end,
+                            minRating: _minRating,
+                            verified: _verifiedOnly ? true : null,
+                            island: _selectedIslands.length == 1 ? _selectedIslands.first : null,
+                          );
+                          context.read<StaysProvider>().fetchStays(filters);
+                          Navigator.pop(context);
+                        },
                         borderRadius: BorderRadius.circular(16),
                         child: const Center(
                           child: Text(

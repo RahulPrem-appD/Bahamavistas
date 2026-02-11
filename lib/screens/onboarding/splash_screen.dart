@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import '../../theme/colors.dart';
+import '../../providers/auth_provider.dart';
+import '../../utils/logger.dart';
 import '../auth/login_screen.dart';
+import '../home/main_navigation.dart';
+
+const _tag = 'Splash';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,45 +24,53 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     _initializeVideo();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAuth();
+    });
+  }
+
+  Future<void> _checkAuth() async {
+    AppLogger.info(_tag, '_checkAuth: starting');
+    final authProvider = context.read<AuthProvider>();
+    await authProvider.tryAutoLogin();
+
+    // Wait a minimum of 3 seconds for splash
+    await Future.delayed(const Duration(seconds: 3));
+
+    if (!mounted) return;
+
+    if (authProvider.isAuthenticated) {
+      AppLogger.info(_tag, '_checkAuth: navigating to MainNavigation');
+      _navigateTo(const MainNavigation());
+    } else {
+      AppLogger.info(_tag, '_checkAuth: navigating to LoginScreen');
+      _navigateTo(const LoginScreen());
+    }
   }
 
   Future<void> _initializeVideo() async {
     _controller = VideoPlayerController.asset('assets/splash.mp4');
-    
+
     try {
       await _controller.initialize();
       setState(() {
         _isInitialized = true;
       });
-      
-      // Set video to fill screen
+
       _controller.setLooping(true);
-      _controller.setVolume(0); // Mute the video
+      _controller.setVolume(0);
       _controller.play();
-      
-      // Navigate to login after 5 seconds
-      Future.delayed(const Duration(seconds: 5), () {
-        if (mounted) {
-          _navigateToLogin();
-        }
-      });
     } catch (e) {
-      // If video fails to load, navigate after 3 seconds
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          _navigateToLogin();
-        }
-      });
+      // Video failed to load — auth check handles navigation
     }
   }
 
-  void _navigateToLogin() {
+  void _navigateTo(Widget screen) {
     if (!mounted) return;
-    
+
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const LoginScreen(),
+        pageBuilder: (context, animation, secondaryAnimation) => screen,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
@@ -94,7 +108,6 @@ class _SplashScreenState extends State<SplashScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Logo Container
                     Container(
                       width: 120,
                       height: 120,

@@ -14,6 +14,7 @@ class ConfirmationScreen extends StatefulWidget {
   final int guests;
   final int rooms;
   final int total;
+  final String? confirmationCode;
 
   const ConfirmationScreen({
     super.key,
@@ -23,6 +24,7 @@ class ConfirmationScreen extends StatefulWidget {
     this.guests = 2,
     this.rooms = 1,
     this.total = 1512,
+    this.confirmationCode,
   });
 
   @override
@@ -77,7 +79,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen>
   @override
   Widget build(BuildContext context) {
     final formatter = DateFormat('MMM d, yyyy');
-    final confirmationCode = 'BV-${DateTime.now().year}-${(10000 + DateTime.now().millisecond * 7).toString().substring(0, 5)}';
+    final confirmationCode = widget.confirmationCode ?? 'BV-${DateTime.now().year}-${(10000 + DateTime.now().millisecond * 7).toString().substring(0, 5)}';
 
     return Scaffold(
       body: Container(

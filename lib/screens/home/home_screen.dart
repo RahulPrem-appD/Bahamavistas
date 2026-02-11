@@ -2,16 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:provider/provider.dart';
 import '../../theme/colors.dart';
 import '../../widgets/bahama_card.dart';
 import '../../widgets/bahama_text_field.dart';
 import '../../utils/constants.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/stays_provider.dart';
+import '../../providers/favorites_provider.dart';
 import '../booking/hotel_detail_screen.dart';
 import 'notifications_screen.dart';
 import 'favorites_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<StaysProvider>().fetchStays();
+      context.read<FavoritesProvider>().fetchFavorites();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,12 +60,17 @@ class HomeScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Hello, Traveler 👋',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: BahamaColors.islandBlueDark,
-                                  ),
+                                Consumer<AuthProvider>(
+                                  builder: (context, auth, _) {
+                                    final name = auth.currentUser?.firstName ?? 'Traveler';
+                                    return Text(
+                                      'Hello, $name',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: BahamaColors.islandBlueDark,
+                                      ),
+                                    );
+                                  },
                                 ),
                                 const SizedBox(height: 4),
                                 const Text(
@@ -210,50 +233,102 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      if (index >= DemoData.hotels.length) return null;
-                      final hotel = DemoData.hotels[index];
-                      return AnimationConfiguration.staggeredList(
-                        position: index,
-                        duration: const Duration(milliseconds: 375),
-                        child: SlideAnimation(
-                          verticalOffset: 50.0,
-                          child: FadeInAnimation(
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              child: BahamaImageCard(
-                                imageUrl: hotel['image'] as String,
-                                title: hotel['name'] as String,
-                                subtitle: '${hotel['location']} • ${hotel['type']}',
-                                price: '\$${hotel['price']}/night',
-                                rating: hotel['rating'] as double,
-                                reviews: hotel['reviews'] as int,
-                                badge: hotel['isVerified'] == true
-                                    ? const BahamaVerifiedBadge()
-                                    : null,
-                                onFavorite: () {},
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) => HotelDetailScreen(
-                                        hotel: hotel,
-                                      ),
-                                    ),
-                                  );
-                                },
+              Consumer<StaysProvider>(
+                builder: (context, staysProvider, _) {
+                  if (staysProvider.isLoading && staysProvider.stays.isEmpty) {
+                    return SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Shimmer.fromColors(
+                              baseColor: BahamaColors.greyLight,
+                              highlightColor: BahamaColors.offWhiteMist,
+                              child: Container(
+                                height: 200,
+                                decoration: BoxDecoration(
+                                  color: BahamaColors.greyLight,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
                               ),
                             ),
                           ),
+                          childCount: 3,
                         ),
-                      );
-                    },
-                    childCount: DemoData.hotels.length,
-                  ),
-                ),
+                      ),
+                    );
+                  }
+
+                  if (staysProvider.error != null && staysProvider.stays.isEmpty) {
+                    return SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            Text(
+                              staysProvider.error!,
+                              style: const TextStyle(color: BahamaColors.greyPrimary),
+                            ),
+                            const SizedBox(height: 12),
+                            TextButton(
+                              onPressed: () => staysProvider.fetchStays(),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  final stays = staysProvider.stays;
+                  return SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final stay = stays[index];
+                          return AnimationConfiguration.staggeredList(
+                            position: index,
+                            duration: const Duration(milliseconds: 375),
+                            child: SlideAnimation(
+                              verticalOffset: 50.0,
+                              child: FadeInAnimation(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: BahamaImageCard(
+                                    imageUrl: stay.mainImage,
+                                    title: stay.name,
+                                    subtitle: '${stay.location} • ${stay.propertyType}',
+                                    price: '\$${stay.price.toStringAsFixed(0)}/night',
+                                    rating: stay.rating,
+                                    reviews: stay.reviewCount,
+                                    badge: stay.verified
+                                        ? const BahamaVerifiedBadge()
+                                        : null,
+                                    onFavorite: () {
+                                      context.read<FavoritesProvider>().toggleFavorite(stay.listingId);
+                                    },
+                                    onTap: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (context) => HotelDetailScreen(
+                                            stay: stay,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        childCount: stays.length,
+                      ),
+                    ),
+                  );
+                },
               ),
 
               const SliverToBoxAdapter(

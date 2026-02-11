@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../theme/colors.dart';
 import '../../widgets/bahama_button.dart';
 import '../../widgets/bahama_text_field.dart';
+import '../../providers/auth_provider.dart';
 import 'signup_screen.dart';
+import 'forgot_password_screen.dart';
 import '../home/main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -13,7 +16,45 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter email and password')),
+      );
+      return;
+    }
+
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.login(email, password);
+
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const MainNavigation()),
+        (route) => false,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(authProvider.error ?? 'Login failed')),
+      );
+      authProvider.clearError();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +135,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: Column(
                       children: [
-                        const BahamaTextField(
+                        BahamaTextField(
+                          controller: _emailController,
                           labelText: 'Email',
                           hintText: 'Enter your email',
                           prefixIcon: Icons.email_outlined,
@@ -102,6 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 20),
                         BahamaTextField(
+                          controller: _passwordController,
                           labelText: 'Password',
                           hintText: 'Enter your password',
                           prefixIcon: Icons.lock_outline,
@@ -119,7 +162,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const ForgotPasswordScreen(),
+                                ),
+                              );
+                            },
                             child: const Text(
                               'Forgot Password?',
                               style: TextStyle(
@@ -130,13 +179,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        BahamaButton(
-                          text: 'Log In',
-                          onPressed: () {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (context) => const MainNavigation(),
-                              ),
+                        Consumer<AuthProvider>(
+                          builder: (context, auth, _) {
+                            return BahamaButton(
+                              text: 'Log In',
+                              isLoading: auth.isLoading,
+                              onPressed: _handleLogin,
                             );
                           },
                         ),
@@ -274,4 +322,3 @@ class _SocialButton extends StatelessWidget {
     );
   }
 }
-

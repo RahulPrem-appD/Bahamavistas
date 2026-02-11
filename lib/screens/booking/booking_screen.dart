@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../theme/colors.dart';
 import '../../widgets/bahama_button.dart';
 import '../../widgets/bahama_card.dart';
 import '../../widgets/date_picker.dart';
 import '../../utils/constants.dart';
+import '../../models/stay.dart';
+import '../../providers/bookings_provider.dart';
 import 'confirmation_screen.dart';
 
 class BookingScreen extends StatefulWidget {
+  final Stay? stay;
   final Map<String, dynamic>? hotel;
 
-  const BookingScreen({super.key, this.hotel});
+  const BookingScreen({super.key, this.stay, this.hotel});
 
   @override
   State<BookingScreen> createState() => _BookingScreenState();
@@ -23,13 +27,27 @@ class _BookingScreenState extends State<BookingScreen> {
   int _rooms = 1;
   DateTime _checkIn = DateTime.now().add(const Duration(days: 7));
   DateTime _checkOut = DateTime.now().add(const Duration(days: 10));
+  bool _isBooking = false;
 
   late Map<String, dynamic> hotel;
+  Stay? _stay;
 
   @override
   void initState() {
     super.initState();
-    hotel = widget.hotel ?? DemoData.hotels[0];
+    _stay = widget.stay;
+    if (_stay != null) {
+      hotel = {
+        'name': _stay!.name,
+        'location': _stay!.location,
+        'price': _stay!.price.toInt(),
+        'rating': _stay!.rating,
+        'reviews': _stay!.reviewCount,
+        'image': _stay!.mainImage,
+      };
+    } else {
+      hotel = widget.hotel ?? DemoData.hotels[0];
+    }
   }
 
   @override
@@ -365,19 +383,54 @@ class _BookingScreenState extends State<BookingScreen> {
               top: false,
               child: BahamaButton(
                 text: 'Confirm & Pay \$$total',
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => ConfirmationScreen(
-                        hotel: hotel,
-                        checkIn: _checkIn,
-                        checkOut: _checkOut,
-                        guests: _adults + _children,
-                        rooms: _rooms,
-                        total: total,
+                isLoading: _isBooking,
+                onPressed: () async {
+                  if (_stay != null) {
+                    setState(() => _isBooking = true);
+                    final bookingsProvider = context.read<BookingsProvider>();
+                    final result = await bookingsProvider.createBooking(
+                      listingId: _stay!.listingId,
+                      startDate: DateFormat('yyyy-MM-dd').format(_checkIn),
+                      endDate: DateFormat('yyyy-MM-dd').format(_checkOut),
+                      guests: _adults + _children,
+                      rooms: _rooms,
+                    );
+                    if (!mounted) return;
+                    setState(() => _isBooking = false);
+
+                    if (result != null) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => ConfirmationScreen(
+                            hotel: hotel,
+                            checkIn: _checkIn,
+                            checkOut: _checkOut,
+                            guests: _adults + _children,
+                            rooms: _rooms,
+                            total: result.totalPrice ~/ 100,
+                            confirmationCode: result.confirmationCode,
+                          ),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(bookingsProvider.error ?? 'Booking failed')),
+                      );
+                    }
+                  } else {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ConfirmationScreen(
+                          hotel: hotel,
+                          checkIn: _checkIn,
+                          checkOut: _checkOut,
+                          guests: _adults + _children,
+                          rooms: _rooms,
+                          total: total,
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  }
                 },
               ),
             ),

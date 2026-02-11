@@ -1,39 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:provider/provider.dart';
 import '../../theme/colors.dart';
 import '../../widgets/bahama_button.dart';
 import '../../widgets/bahama_card.dart';
 import '../../utils/constants.dart';
+import '../../models/stay.dart';
+import '../../providers/favorites_provider.dart';
 import 'booking_screen.dart';
 
 class HotelDetailScreen extends StatefulWidget {
+  final Stay? stay;
   final Map<String, dynamic>? hotel;
 
-  const HotelDetailScreen({super.key, this.hotel});
+  const HotelDetailScreen({super.key, this.stay, this.hotel});
 
   @override
   State<HotelDetailScreen> createState() => _HotelDetailScreenState();
 }
 
 class _HotelDetailScreenState extends State<HotelDetailScreen> {
-  bool isFavorite = false;
   int currentImageIndex = 0;
 
+  late Stay? _stay;
   late Map<String, dynamic> hotel;
   late List<String> galleryImages;
 
   @override
   void initState() {
     super.initState();
-    hotel = widget.hotel ?? DemoData.hotels[0];
-    galleryImages = [
-      hotel['image'] as String,
-      AppImages.hotelRoom,
-      AppImages.poolResort,
-      AppImages.hotelLobby,
-      AppImages.beachResort,
-    ];
+    _stay = widget.stay;
+    if (_stay != null) {
+      hotel = {
+        'name': _stay!.name,
+        'location': _stay!.location,
+        'price': _stay!.price.toInt(),
+        'rating': _stay!.rating,
+        'reviews': _stay!.reviewCount,
+        'isVerified': _stay!.verified,
+        'image': _stay!.mainImage,
+        'type': _stay!.propertyType,
+      };
+      galleryImages = _stay!.images.isNotEmpty ? _stay!.images : [AppImages.beachResort];
+    } else {
+      hotel = widget.hotel ?? DemoData.hotels[0];
+      galleryImages = [
+        hotel['image'] as String,
+        AppImages.hotelRoom,
+        AppImages.poolResort,
+        AppImages.hotelLobby,
+        AppImages.beachResort,
+      ];
+    }
   }
 
   @override
@@ -139,11 +158,18 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
                                   onTap: () {},
                                 ),
                                 const SizedBox(width: 12),
-                                _CircleButton(
-                                  icon: isFavorite ? Icons.favorite : Icons.favorite_border_rounded,
-                                  iconColor: isFavorite ? Colors.red : null,
-                                  onTap: () {
-                                    setState(() => isFavorite = !isFavorite);
+                                Consumer<FavoritesProvider>(
+                                  builder: (context, favProvider, _) {
+                                    final isFav = _stay != null && favProvider.isFavorite(_stay!.listingId);
+                                    return _CircleButton(
+                                      icon: isFav ? Icons.favorite : Icons.favorite_border_rounded,
+                                      iconColor: isFav ? Colors.red : null,
+                                      onTap: () {
+                                        if (_stay != null) {
+                                          favProvider.toggleFavorite(_stay!.listingId);
+                                        }
+                                      },
+                                    );
                                   },
                                 ),
                               ],
@@ -303,9 +329,9 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            const Text(
-                              'Experience the ultimate island getaway at this iconic resort. World-class amenities, stunning ocean views, and unforgettable experiences await you. Perfect for families, couples, and solo travelers looking for a premium Bahamas experience.',
-                              style: TextStyle(
+                            Text(
+                              _stay?.description ?? 'Experience the ultimate island getaway at this iconic resort. World-class amenities, stunning ocean views, and unforgettable experiences await you. Perfect for families, couples, and solo travelers looking for a premium Bahamas experience.',
+                              style: const TextStyle(
                                 fontSize: 14,
                                 color: BahamaColors.greyPrimary,
                                 height: 1.6,
@@ -543,7 +569,7 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
                         onPressed: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (context) => BookingScreen(hotel: hotel),
+                              builder: (context) => BookingScreen(stay: _stay, hotel: hotel),
                             ),
                           );
                         },

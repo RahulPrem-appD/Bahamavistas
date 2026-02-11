@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../../theme/colors.dart';
 import '../../widgets/bahama_card.dart';
-import '../../utils/constants.dart';
+import '../../providers/bookings_provider.dart';
 
 class TripsScreen extends StatefulWidget {
   const TripsScreen({super.key});
@@ -20,6 +22,9 @@ class _TripsScreenState extends State<TripsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BookingsProvider>().fetchBookings();
+    });
   }
 
   @override
@@ -118,27 +123,42 @@ class _TripsScreenState extends State<TripsScreen>
 class _UpcomingTrips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final upcomingTrips = DemoData.trips
-        .where((trip) => trip['status'] == 'upcoming')
-        .toList();
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(24),
-      itemCount: upcomingTrips.length,
-      itemBuilder: (context, index) {
-        final trip = upcomingTrips[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: _TripCard(
-            hotelName: trip['hotelName'] as String,
-            location: trip['location'] as String,
-            checkIn: trip['checkIn'] as String,
-            checkOut: trip['checkOut'] as String,
-            status: TripStatus.upcoming,
-            confirmationCode: trip['confirmationCode'] as String,
-            daysUntil: trip['daysUntil'] as int,
-            imageUrl: trip['image'] as String,
-          ),
+    return Consumer<BookingsProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.bookings.isEmpty) {
+          return _buildShimmer();
+        }
+        final upcoming = provider.upcomingBookings;
+        if (upcoming.isEmpty) {
+          return _buildEmpty('No Upcoming Trips', 'Book your next island getaway!');
+        }
+        final fmt = DateFormat('MMM d, yyyy');
+        return ListView.builder(
+          padding: const EdgeInsets.all(24),
+          itemCount: upcoming.length,
+          itemBuilder: (context, index) {
+            final b = upcoming[index];
+            final checkInDate = DateTime.tryParse(b.startDate);
+            final daysUntil = checkInDate != null
+                ? checkInDate.difference(DateTime.now()).inDays
+                : null;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _TripCard(
+                bookingId: b.id,
+                hotelName: b.listingName ?? 'Booking #${b.confirmationCode}',
+                location: b.location ?? 'Bahamas',
+                checkIn: checkInDate != null ? fmt.format(checkInDate) : b.startDate,
+                checkOut: DateTime.tryParse(b.endDate) != null
+                    ? fmt.format(DateTime.parse(b.endDate))
+                    : b.endDate,
+                status: TripStatus.upcoming,
+                confirmationCode: b.confirmationCode,
+                daysUntil: daysUntil != null && daysUntil > 0 ? daysUntil : null,
+                imageUrl: b.listingImage ?? '',
+              ),
+            );
+          },
         );
       },
     );
@@ -148,47 +168,9 @@ class _UpcomingTrips extends StatelessWidget {
 class _ActiveTrips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(48),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: BahamaColors.islandBlue.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.beach_access_rounded,
-                size: 48,
-                color: BahamaColors.islandBlue,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'No Active Trips',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: BahamaColors.deepTeal,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Your current trips will appear here when you\'re traveling',
-              style: TextStyle(
-                fontSize: 14,
-                color: BahamaColors.greyPrimary,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+    return _buildEmpty(
+      'No Active Trips',
+      'Your current trips will appear here when you\'re traveling',
     );
   }
 }
@@ -196,37 +178,116 @@ class _ActiveTrips extends StatelessWidget {
 class _PastTrips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final pastTrips = DemoData.trips
-        .where((trip) => trip['status'] == 'completed' || trip['status'] == 'cancelled')
-        .toList();
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(24),
-      itemCount: pastTrips.length,
-      itemBuilder: (context, index) {
-        final trip = pastTrips[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: _TripCard(
-            hotelName: trip['hotelName'] as String,
-            location: trip['location'] as String,
-            checkIn: trip['checkIn'] as String,
-            checkOut: trip['checkOut'] as String,
-            status: trip['status'] == 'completed' 
-                ? TripStatus.completed 
-                : TripStatus.cancelled,
-            confirmationCode: trip['confirmationCode'] as String,
-            imageUrl: trip['image'] as String,
-          ),
+    return Consumer<BookingsProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.bookings.isEmpty) {
+          return _buildShimmer();
+        }
+        final past = [...provider.completedBookings, ...provider.cancelledBookings];
+        if (past.isEmpty) {
+          return _buildEmpty('No Past Trips', 'Your travel history will appear here.');
+        }
+        final fmt = DateFormat('MMM d, yyyy');
+        return ListView.builder(
+          padding: const EdgeInsets.all(24),
+          itemCount: past.length,
+          itemBuilder: (context, index) {
+            final b = past[index];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _TripCard(
+                bookingId: b.id,
+                hotelName: b.listingName ?? 'Booking #${b.confirmationCode}',
+                location: b.location ?? 'Bahamas',
+                checkIn: DateTime.tryParse(b.startDate) != null
+                    ? fmt.format(DateTime.parse(b.startDate))
+                    : b.startDate,
+                checkOut: DateTime.tryParse(b.endDate) != null
+                    ? fmt.format(DateTime.parse(b.endDate))
+                    : b.endDate,
+                status: b.isCancelled ? TripStatus.cancelled : TripStatus.completed,
+                confirmationCode: b.confirmationCode,
+                imageUrl: b.listingImage ?? '',
+                hasReview: b.hasReview,
+              ),
+            );
+          },
         );
       },
     );
   }
 }
 
+Widget _buildShimmer() {
+  return ListView.builder(
+    padding: const EdgeInsets.all(24),
+    itemCount: 3,
+    itemBuilder: (context, index) => Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Shimmer.fromColors(
+        baseColor: BahamaColors.greyLight,
+        highlightColor: BahamaColors.offWhiteMist,
+        child: Container(
+          height: 240,
+          decoration: BoxDecoration(
+            color: BahamaColors.greyLight,
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildEmpty(String title, String subtitle) {
+  return Center(
+    child: Padding(
+      padding: const EdgeInsets.all(48),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: BahamaColors.islandBlue.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.beach_access_rounded,
+              size: 48,
+              color: BahamaColors.islandBlue,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: BahamaColors.deepTeal,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 14,
+              color: BahamaColors.greyPrimary,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 enum TripStatus { upcoming, active, completed, cancelled }
 
 class _TripCard extends StatelessWidget {
+  final int? bookingId;
   final String hotelName;
   final String location;
   final String checkIn;
@@ -235,8 +296,10 @@ class _TripCard extends StatelessWidget {
   final String confirmationCode;
   final int? daysUntil;
   final String imageUrl;
+  final bool hasReview;
 
   const _TripCard({
+    this.bookingId,
     required this.hotelName,
     required this.location,
     required this.checkIn,
@@ -245,6 +308,7 @@ class _TripCard extends StatelessWidget {
     required this.confirmationCode,
     this.daysUntil,
     required this.imageUrl,
+    this.hasReview = false,
   });
 
   @override
@@ -598,12 +662,34 @@ class _TripCard extends StatelessWidget {
                     _DetailRow(label: 'Room Type', value: 'Deluxe Ocean View'),
                     _DetailRow(label: 'Guests', value: '2 Adults'),
                     const SizedBox(height: 24),
-                    if (status == TripStatus.upcoming) ...[
+                    if (status == TripStatus.upcoming && bookingId != null) ...[
                       Row(
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () => Navigator.pop(context),
+                              onPressed: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                    title: const Text('Cancel Booking'),
+                                    content: const Text('Are you sure you want to cancel this booking?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+                                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes, Cancel')),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed == true && context.mounted) {
+                                  Navigator.pop(context);
+                                  final success = await context.read<BookingsProvider>().cancelBooking(bookingId!);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(success ? 'Booking cancelled' : 'Failed to cancel booking')),
+                                    );
+                                  }
+                                }
+                              },
                               icon: const Icon(Icons.cancel_outlined, size: 18),
                               label: const Text('Cancel'),
                               style: OutlinedButton.styleFrom(
@@ -634,7 +720,7 @@ class _TripCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ] else if (status == TripStatus.completed) ...[
+                    ] else if (status == TripStatus.completed && !hasReview) ...[
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(

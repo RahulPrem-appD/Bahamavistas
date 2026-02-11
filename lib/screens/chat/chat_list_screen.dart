@@ -1,10 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:intl/intl.dart';
 import '../../theme/colors.dart';
 import '../../widgets/bahama_card.dart';
+import '../../providers/messages_provider.dart';
 import 'chat_detail_screen.dart';
 
-class ChatListScreen extends StatelessWidget {
+class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
+
+  @override
+  State<ChatListScreen> createState() => _ChatListScreenState();
+}
+
+class _ChatListScreenState extends State<ChatListScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MessagesProvider>().fetchConversations();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,106 +86,97 @@ class ChatListScreen extends StatelessWidget {
 
             // Chat list
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(24),
-                children: [
-                  // Support chat
-                  _ChatItem(
-                    name: 'BahamaVista Support',
-                    message: 'Hi! How can we help you today?',
-                    time: 'Just now',
-                    isSupport: true,
-                    unreadCount: 1,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const ChatDetailScreen(
-                            name: 'BahamaVista Support',
-                            isSupport: true,
+              child: Consumer<MessagesProvider>(
+                builder: (context, provider, _) {
+                  if (provider.isLoading && provider.conversations.isEmpty) {
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(24),
+                      itemCount: 4,
+                      itemBuilder: (context, index) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Shimmer.fromColors(
+                          baseColor: BahamaColors.greyLight,
+                          highlightColor: BahamaColors.offWhiteMist,
+                          child: Container(
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: BahamaColors.greyLight,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
+                      ),
+                    );
+                  }
 
-                  // Vendor chats
-                  _ChatItem(
-                    name: 'Atlantis Paradise Island',
-                    message: 'Your room is ready! We look forward to...',
-                    time: '2h ago',
-                    isVerified: true,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const ChatDetailScreen(
-                            name: 'Atlantis Paradise Island',
-                            isSupport: false,
+                  if (provider.conversations.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 64,
+                            color: BahamaColors.islandBlue.withOpacity(0.3),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No messages yet',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: BahamaColors.greyPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
 
-                  _ChatItem(
-                    name: 'Bahamas Car Rentals',
-                    message: 'Your Jeep Wrangler is confirmed for Dec 29',
-                    time: 'Yesterday',
-                    isVerified: true,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const ChatDetailScreen(
-                            name: 'Bahamas Car Rentals',
-                            isSupport: false,
-                          ),
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(24),
+                    itemCount: provider.conversations.length,
+                    itemBuilder: (context, index) {
+                      final convo = provider.conversations[index];
+                      final timeStr = _formatTime(convo.lastMessage.createdAt);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _ChatItem(
+                          name: convo.participantName,
+                          message: convo.lastMessage.body,
+                          time: timeStr,
+                          unreadCount: convo.unreadCount > 0 ? convo.unreadCount : null,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => ChatDetailScreen(
+                                  name: convo.participantName,
+                                  participantId: convo.participantId,
+                                  isSupport: false,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       );
                     },
-                  ),
-                  const SizedBox(height: 12),
-
-                  _ChatItem(
-                    name: 'Exuma Adventures',
-                    message: 'Thank you for booking! See you at the dock at 8 AM',
-                    time: 'Dec 18',
-                    isVerified: true,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const ChatDetailScreen(
-                            name: 'Exuma Adventures',
-                            isSupport: false,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
-                  _ChatItem(
-                    name: 'Nassau Tours',
-                    message: 'Great! The sunset cruise is available',
-                    time: 'Dec 15',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const ChatDetailScreen(
-                            name: 'Nassau Tours',
-                            isSupport: false,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _formatTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final diff = now.difference(dateTime);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 2) return 'Yesterday';
+    return DateFormat('MMM d').format(dateTime);
   }
 }
 
@@ -220,7 +228,7 @@ class _ChatItem extends StatelessWidget {
                       size: 28,
                     )
                   : Text(
-                      name[0],
+                      name.isNotEmpty ? name[0] : '?',
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -332,4 +340,3 @@ class _ChatItem extends StatelessWidget {
     );
   }
 }
-

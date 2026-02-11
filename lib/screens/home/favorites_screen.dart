@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:provider/provider.dart';
 import '../../theme/colors.dart';
 import '../../widgets/bahama_card.dart';
-import '../../utils/constants.dart';
+import '../../providers/favorites_provider.dart';
 import '../booking/hotel_detail_screen.dart';
 import '../booking/experience_detail_screen.dart';
 import '../booking/car_detail_screen.dart';
@@ -24,6 +25,9 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<FavoritesProvider>().fetchFavorites();
+    });
   }
 
   @override
@@ -131,49 +135,65 @@ class _FavoritesScreenState extends State<FavoritesScreen>
 class _FavoriteHotels extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final hotels = DemoData.hotels.take(3).toList();
-    
-    return AnimationLimiter(
-      child: ListView.builder(
-        padding: const EdgeInsets.all(24),
-        itemCount: hotels.length,
-        itemBuilder: (context, index) {
-          final hotel = hotels[index];
-          return AnimationConfiguration.staggeredList(
-            position: index,
-            duration: const Duration(milliseconds: 375),
-            child: SlideAnimation(
-              verticalOffset: 50.0,
-              child: FadeInAnimation(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: BahamaImageCard(
-                    imageUrl: hotel['image'] as String,
-                    title: hotel['name'] as String,
-                    subtitle: '${hotel['location']} • ${hotel['type']}',
-                    price: '\$${hotel['price']}/night',
-                    rating: hotel['rating'] as double,
-                    reviews: hotel['reviews'] as int,
-                    badge: hotel['isVerified'] == true
-                        ? const BahamaVerifiedBadge()
-                        : null,
-                    isFavorite: true,
-                    onFavorite: () {},
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => HotelDetailScreen(hotel: hotel),
-                        ),
-                      );
-                    },
+    return Consumer<FavoritesProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.favorites.isEmpty) {
+          return _buildFavShimmer();
+        }
+        final stays = provider.stayFavorites;
+        if (stays.isEmpty) {
+          return _buildFavEmpty('No favorite hotels yet');
+        }
+        return AnimationLimiter(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: stays.length,
+            itemBuilder: (context, index) {
+              final fav = stays[index];
+              final listing = fav.listing;
+              return AnimationConfiguration.staggeredList(
+                position: index,
+                duration: const Duration(milliseconds: 375),
+                child: SlideAnimation(
+                  verticalOffset: 50.0,
+                  child: FadeInAnimation(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: BahamaImageCard(
+                        imageUrl: listing?.mainImage ?? '',
+                        title: listing?.name ?? 'Unknown',
+                        subtitle: listing?.location ?? '',
+                        price: '\$${listing?.price.toStringAsFixed(0) ?? '0'}/night',
+                        rating: listing?.rating ?? 0,
+                        isFavorite: true,
+                        onFavorite: () {
+                          context.read<FavoritesProvider>().toggleFavorite(fav.listingId);
+                        },
+                        onTap: () {
+                          final hotelMap = {
+                            'name': listing?.name ?? '',
+                            'location': listing?.location ?? '',
+                            'price': listing?.price.toInt() ?? 0,
+                            'rating': listing?.rating ?? 0,
+                            'reviews': 0,
+                            'image': listing?.mainImage ?? '',
+                          };
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => HotelDetailScreen(hotel: hotelMap),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -181,48 +201,64 @@ class _FavoriteHotels extends StatelessWidget {
 class _FavoriteExperiences extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final experiences = DemoData.experiences.take(3).toList();
-    
-    return AnimationLimiter(
-      child: ListView.builder(
-        padding: const EdgeInsets.all(24),
-        itemCount: experiences.length,
-        itemBuilder: (context, index) {
-          final exp = experiences[index];
-          return AnimationConfiguration.staggeredList(
-            position: index,
-            duration: const Duration(milliseconds: 375),
-            child: SlideAnimation(
-              verticalOffset: 50.0,
-              child: FadeInAnimation(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: BahamaImageCard(
-                    imageUrl: exp['image'] as String,
-                    title: exp['name'] as String,
-                    subtitle: '${exp['location']} • ${exp['duration']}',
-                    price: '\$${exp['price']}/person',
-                    rating: exp['rating'] as double,
-                    badge: exp['isVerified'] == true
-                        ? const BahamaVerifiedBadge()
-                        : null,
-                    isFavorite: true,
-                    onFavorite: () {},
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ExperienceDetailScreen(experience: exp),
-                        ),
-                      );
-                    },
+    return Consumer<FavoritesProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.favorites.isEmpty) {
+          return _buildFavShimmer();
+        }
+        final exps = provider.experienceFavorites;
+        if (exps.isEmpty) {
+          return _buildFavEmpty('No favorite experiences yet');
+        }
+        return AnimationLimiter(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: exps.length,
+            itemBuilder: (context, index) {
+              final fav = exps[index];
+              final listing = fav.listing;
+              return AnimationConfiguration.staggeredList(
+                position: index,
+                duration: const Duration(milliseconds: 375),
+                child: SlideAnimation(
+                  verticalOffset: 50.0,
+                  child: FadeInAnimation(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: BahamaImageCard(
+                        imageUrl: listing?.mainImage ?? '',
+                        title: listing?.name ?? 'Unknown',
+                        subtitle: listing?.location ?? '',
+                        price: '\$${listing?.price.toStringAsFixed(0) ?? '0'}/person',
+                        rating: listing?.rating ?? 0,
+                        isFavorite: true,
+                        onFavorite: () {
+                          context.read<FavoritesProvider>().toggleFavorite(fav.listingId);
+                        },
+                        onTap: () {
+                          final expMap = {
+                            'name': listing?.name ?? '',
+                            'location': listing?.location ?? '',
+                            'price': listing?.price.toInt() ?? 0,
+                            'rating': listing?.rating ?? 0,
+                            'image': listing?.mainImage ?? '',
+                          };
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ExperienceDetailScreen(experience: expMap),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -230,49 +266,119 @@ class _FavoriteExperiences extends StatelessWidget {
 class _FavoriteCars extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    // Show 2 saved cars for demo
-    final cars = DemoData.cars.where((c) => c['isPopular'] == true).toList();
-    
-    return AnimationLimiter(
-      child: ListView.builder(
-        padding: const EdgeInsets.all(24),
-        itemCount: cars.length,
-        itemBuilder: (context, index) {
-          final car = cars[index];
-          return AnimationConfiguration.staggeredList(
-            position: index,
-            duration: const Duration(milliseconds: 375),
-            child: SlideAnimation(
-              verticalOffset: 50.0,
-              child: FadeInAnimation(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _CarFavoriteCard(
-                    car: car,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CarDetailScreen(car: car),
-                        ),
-                      );
-                    },
+    return Consumer<FavoritesProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.favorites.isEmpty) {
+          return _buildFavShimmer();
+        }
+        final cars = provider.carFavorites;
+        if (cars.isEmpty) {
+          return _buildFavEmpty('No favorite cars yet');
+        }
+        return AnimationLimiter(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: cars.length,
+            itemBuilder: (context, index) {
+              final fav = cars[index];
+              final listing = fav.listing;
+              final carMap = {
+                'name': listing?.name ?? 'Unknown',
+                'location': listing?.location ?? '',
+                'price': listing?.price.toInt() ?? 0,
+                'rating': listing?.rating ?? 0,
+                'image': listing?.mainImage ?? '',
+                'type': '',
+                'transmission': '',
+                'seats': 4,
+                'features': <String>[],
+                'isPopular': false,
+              };
+              return AnimationConfiguration.staggeredList(
+                position: index,
+                duration: const Duration(milliseconds: 375),
+                child: SlideAnimation(
+                  verticalOffset: 50.0,
+                  child: FadeInAnimation(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _CarFavoriteCard(
+                        car: carMap,
+                        listingId: fav.listingId,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CarDetailScreen(car: carMap),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
 
+Widget _buildFavShimmer() {
+  return ListView.builder(
+    padding: const EdgeInsets.all(24),
+    itemCount: 3,
+    itemBuilder: (context, index) => Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Shimmer.fromColors(
+        baseColor: BahamaColors.greyLight,
+        highlightColor: BahamaColors.offWhiteMist,
+        child: Container(
+          height: 200,
+          decoration: BoxDecoration(
+            color: BahamaColors.greyLight,
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildFavEmpty(String message) {
+  return Center(
+    child: Padding(
+      padding: const EdgeInsets.all(48),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.favorite_border_rounded,
+            size: 64,
+            color: BahamaColors.islandBlue.withOpacity(0.3),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: const TextStyle(
+              fontSize: 16,
+              color: BahamaColors.greyPrimary,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _CarFavoriteCard extends StatelessWidget {
   final Map<String, dynamic> car;
+  final int? listingId;
   final VoidCallback onTap;
 
-  const _CarFavoriteCard({required this.car, required this.onTap});
+  const _CarFavoriteCard({required this.car, this.listingId, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -332,15 +438,20 @@ class _CarFavoriteCard extends StatelessWidget {
                 Positioned(
                   top: 12,
                   right: 12,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: BahamaColors.whiteSand,
-                      shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8)],
+                  child: GestureDetector(
+                    onTap: listingId != null
+                        ? () => context.read<FavoritesProvider>().toggleFavorite(listingId!)
+                        : null,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: BahamaColors.whiteSand,
+                        shape: BoxShape.circle,
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8)],
+                      ),
+                      child: const Icon(Icons.favorite, size: 18, color: Colors.red),
                     ),
-                    child: const Icon(Icons.favorite, size: 18, color: Colors.red),
                   ),
                 ),
               ],
